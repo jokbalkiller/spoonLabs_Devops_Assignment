@@ -1,0 +1,51 @@
+name: SpringBoot Gradle BootJAR 빌드
+
+jobs:
+  gradleBuild:
+    name: Gradle Build
+    runs-on: [self-hosted]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build with Gradle
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build --no-daemon --console=plain -x test
+
+  dockerBuild:
+    needs: gradleBuild
+    name: Docker Build, ECR Push
+    runs-on: [self-hosted]
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build image amd ECR push
+        id: build-image-ecr-push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker buildx build --file githubActions/Dockerfile --platform linux/amd64,linux/arm64 --tag $ECR_REGISTRY/springboot:$IMAGE_TAG --push .
+
+      - run: echo "🍏 This job's status is ${{ job.status }}."
