@@ -1,3 +1,17 @@
+module "load_balancer_irsa_role" {
+  source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+
+  role_name                              = "${module.eks.cluster_name}-alb"
+  attach_load_balancer_controller_policy = true
+
+  oidc_providers = {
+    main = {
+      provider_arn = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+    }
+  }
+}
+
 resource "kubernetes_service_account" "alb" {
   metadata {
     name      = "aws-load-balancer-controller"
@@ -27,7 +41,7 @@ resource "helm_release" "aws_load_balancer_controller" {
     clusterName: ${module.eks.cluster_name}
     serviceAccount:
       create: false
-      name: aws-load-balancer-controller
+      name: ${kubernetes_service_account.alb.id}
     EOT
   ]
 }

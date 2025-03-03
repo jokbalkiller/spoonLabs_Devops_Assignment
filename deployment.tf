@@ -53,9 +53,9 @@ resource "kubernetes_deployment" "springboot" {
               path = "/actuator/health"
               port = "8080"
             }
-            initialDelaySeconds: 10
-            periodSeconds: 2
-            failureThreshold: 30
+            initialDelaySeconds = 10
+            periodSeconds = 2
+            failureThreshold = 30
           }
 
           liveness_probe {
@@ -63,9 +63,9 @@ resource "kubernetes_deployment" "springboot" {
               path = "/actuator/health"
               port = "8080"
             }
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            failureThreshold: 9
+            initialDelaySeconds = 30
+            periodSeconds = 10
+            failureThreshold = 9
           }
 
           lifecycle {

@@ -51,12 +51,12 @@ resource "helm_release" "karpenter" {
   ]
 }
 
-resource "kubernetes_manifest" "karpenter_ec2_node_class" {
+resource "kubernetes_manifest" "karpenter_ec2_node_class_1" {
   manifest = {
     apiVersion = "karpenter.k8s.aws/v1"
     kind       = "EC2NodeClass"
     metadata = {
-      name = "default"
+      name = "default_0"
     }
     spec = {
       amiSelectorTerms = [
@@ -67,31 +67,42 @@ resource "kubernetes_manifest" "karpenter_ec2_node_class" {
       role = module.karpenter.node_iam_role_name
       subnetSelectorTerms = [
         {
-          tags = {
-            "karpenter.sh/discovery" = var.cluster_name
-          }
+          id = module.vpc.private_subnets[0]
         }
       ]
-      securityGroupSelectorTerms = [
-        {
-          tags = {
-            "karpenter.sh/discovery" = var.cluster_name
-          }
-        }
-      ]
-      tags = {
-        "karpenter.sh/discovery" = var.cluster_name
-      }
     }
   }
 }
 
-resource "kubernetes_manifest" "karpenter_node_pool" {
+resource "kubernetes_manifest" "karpenter_ec2_node_class_2" {
+  manifest = {
+    apiVersion = "karpenter.k8s.aws/v1"
+    kind       = "EC2NodeClass"
+    metadata = {
+      name = "default_1"
+    }
+    spec = {
+      amiSelectorTerms = [
+        {
+          alias = "al2023@@latest"
+        }
+      ]
+      role = module.karpenter.node_iam_role_name
+      subnetSelectorTerms = [
+        {
+          id = module.vpc.private_subnets[1]
+        }
+      ]
+    }
+  }
+}
+
+resource "kubernetes_manifest" "karpenter_node_pool_1" {
   manifest = {
     apiVersion = "karpenter.sh/v1"
     kind       = "NodePool"
     metadata = {
-      name = "default"
+      name = "default-0"
     }
     spec = {
       template = {
@@ -106,7 +117,7 @@ resource "kubernetes_manifest" "karpenter_node_pool" {
             {
               key      = "kubernetes.io/arch"
               operator = "In"
-              values   = ["armd64","amd64"]
+              values   = ["amd64"]
             },
             {
               key      = "kubernetes.io/os"
@@ -132,17 +143,79 @@ resource "kubernetes_manifest" "karpenter_node_pool" {
           nodeClassRef = {
             group = "karpenter.k8s.aws"
             kind  = "EC2NodeClass"
-            name  = "default"
+            name  = "default_0"
           }
           expireAfter = "720h"
         }
       }
       limits = {
-        cpu = 1000
+        cpu = 4
       }
       disruption = {
         consolidationPolicy = "WhenEmptyOrUnderutilized"
-        consolidateAfter    = "1m"
+        consolidateAfter    = "30s"
+      }
+    }
+  }
+}
+
+resource "kubernetes_manifest" "karpenter_node_pool_1" {
+  manifest = {
+    apiVersion = "karpenter.sh/v1"
+    kind       = "NodePool"
+    metadata = {
+      name = "default-1"
+    }
+    spec = {
+      template = {
+        metadata = {
+          labels = {
+            app = "springboot"
+            os   = "amd"
+          }
+        }
+        spec = {
+          requirements = [
+            {
+              key      = "kubernetes.io/arch"
+              operator = "In"
+              values   = ["amd64"]
+            },
+            {
+              key      = "kubernetes.io/os"
+              operator = "In"
+              values   = ["linux"]
+            },
+            {
+              key      = "karpenter.sh/capacity-type"
+              operator = "In"
+              values   = ["on-demand"]
+            },
+            {
+              key      = "karpenter.k8s.aws/instance-category"
+              operator = "In"
+              values   = ["c", "m", "r"]
+            },
+            {
+              key      = "karpenter.k8s.aws/instance-generation"
+              operator = "Gt"
+              values   = ["2"]
+            }
+          ]
+          nodeClassRef = {
+            group = "karpenter.k8s.aws"
+            kind  = "EC2NodeClass"
+            name  = "default_1"
+          }
+          expireAfter = "720h"
+        }
+      }
+      limits = {
+        cpu = 4
+      }
+      disruption = {
+        consolidationPolicy = "WhenEmptyOrUnderutilized"
+        consolidateAfter    = "30s"
       }
     }
   }
