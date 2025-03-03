@@ -55,13 +55,13 @@ No outputs.
 <!-- END_TF_DOCS -->
 
 # 2. 코드 및 구조 설계
-1. 테라폼 tf 파일은 자원별로 분리하여 관리에 편하도록 작성하였습니다.
-2. 잘모르는 상태에서 더 많은 자원 혹은 옵션을 추가할 경우 비용 낭비 및 예상치 못한 에러 상황을 만드는 계기가 되기 때문에 시나리오 외 불필요한 옵션은 추가하지 않았습니다.
+1. 테라폼 tf 파일은 자원별로 분리하여 읽기에 편하도록 작성하였습니다.
+2. 확실하지 않은 상태에서 더 많은 자원 혹은 옵션을 추가할 경우 비용 낭비 및 예상치 못한 에러 상황을 만드는 계기가 되기 때문에 시나리오 외 불필요한 옵션은 추가하지 않았습니다.
 3. 협업 및 인수인계 시 가독성 증대를 위해 공식 DOCS 및 가이드의 예시 구조를 최대한 살리고자 노력하였습니다.
 4. 변수명에 terraform.workespace 를 사용하여 환경별로 분리하여 사용할 수 있습니다.
 
 ## 1. provider.tf
-1. provider 의 경우 aws, kubernetes, terraform, helm 버전을 지정하였으며 Backend를 사용할 경우 tfstate의 S3 저장 후 공동 작업, 충돌 방지 기능을 사용할 수 있도록 작성하였습니다.
+1. provider 의 경우 aws, kubernetes, terraform, helm 버전을 지정하였으며 backend를 사용할 경우 tfstate의 S3 저장 후 공동 작업, 충돌 방지 기능을 사용할 수 있도록 작성하였습니다.
 
 ## 2. vpc.tf
 1. 시나리오 요구사항에 맞춰 2개의 AZ를 사용했으며 각 2개의 Public, Private Subnet을 생성하였으며 서브넷에는 AWS ELB, Karpenter 가 사용될 서브넷임을 지정하는 태그를 추가하였습니다.
@@ -74,9 +74,17 @@ No outputs.
 ```
 
 ## 3. eks.tf
+1. subnet_ids 에 시나리오 요구사항에 맞춰 private subnets을 지정합니다.
+2. 기본 addons을 모두 사용합니다.
+3. Karpenter 가 동작함과 동시에 노드 관리에서 제외되는 Karpenter 전용 관리형 노드 그룹을 생성하여 지정해줍니다.
+4. Karpenter 접근을 위한 엔드포인트 true 옵션을 추가하였습니다.
+```terraform
+  cluster_endpoint_public_access           = true
+```
 
-## 4. karpenter.tf(선택)
-1. 보통 태그를 사용하여 걸리는 서브넷 중 IP 여분이 많은 곳에 생성하지만 각 서브넷 ID를 지정해서 서브넷당 한개씩 노드그룹을 생성해보는 로직을 처음진행해 보았습니다.
+## 4. karpenter.tf
+1. Karpenter 모듈을 통한 설치를 진행하며 helm values 옵션을 통해 EKS Karpenter 전용 관리형 노드에 설치되게 합니다. 
+2. 보통 태그를 사용하여 다양한 서브넷 중 IP 여분이 많은 곳에 생성하는 원리입니다. 하지만 시나리오에서는 각 서브넷 당 하나씩의 노드배분을 요구하였기 때문에 서브넷 ID를 직접  한개씩 노드그룹을 생성해보는 로직을 처음진행해 보았습니다.
 
 ## 5. deployment.tf
 1. 안정성을 위해 readiness, liveness 프로브 2개를 설정하였습니다.(선택)
@@ -87,16 +95,18 @@ No outputs.
 1. port, target port 모두 동일하게 8080를 사용하는 Cluster IP 기본 서비스를 생성하였으며 EKS의 vpc-cni Add on, ALB Target-type IP 모드를 사용할 경우 충분히 외부 노출이 가능합니다. 
 
 ## 7. alb.tf
-1. EKS 쿠버네티스의 서비스 및 인그레스와의 직적 연동을 위해 ALB Controller를 Helm 으로 설치하여 사용하며 이또한 전부 Terraform 자원으로 설계하였습니다.
-2. 
+1. EKS 쿠버네티스의 서비스 및 인그레스와의 직적 연동을 위해 ALB Controller 를 Helm 으로 설치하여 사용하며 이또한 전부 Terraform 자원으로 설계하였습니다.
+2. ALB Controller 에 필요한 IRSA는 모듈을 통해 구현하였습니다.
 
 ## 8. ingress.tf
 1. http 접근 시 https로 리다이렉트를 위한 어노테이션을 추가하였습니다.
-2. 타겟 모드 IP를 설정하였습니다.
+2. EKS POD와 연결하는 용도에 맞도록 타겟 모드를 IP로 설정하였습니다.
 3. 이미지 업데이트, 재배포, 노드 변경 등의 이유로 타겟 그룹에 대한 변경 시 빠른 헬스체크 성공을 위해 타겟 그룹의 경로 지정 및 체크 주기를 최소값으로 지정하였습니다.
 
-## 9. docker, githubActions
-
+## 9. Dockerfile, githubActions
+1. SpringBoot가 코드가 있는 레포에서 github Actions이 돌았다는 가정으로 gradle build, docker build and push를 동작하는 yaml을 작성하였습니다.
+2. Dockerfile 은 jar 파일과 실행 명령어인 entrypoint.sh를 Copy하여 entrypoint.sh 을 실행합니다.
+3. entrypoint.sh 은 jar 실행 시 OOM 방지를 위해 POD의 limit 메모리의 75%로 맥스힙메모리사이즈를 설정하는 옵션이 들어가있습니다.(선택)
 
 # 참고
 https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/lbc-helm.html
