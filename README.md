@@ -58,7 +58,7 @@ No outputs.
 1. 테라폼 tf 파일은 자원별로 분리하여 읽기에 편하도록 작성하였습니다.
 2. 확실하지 않은 상태에서 더 많은 자원 혹은 옵션을 추가할 경우 비용 낭비 및 예상치 못한 에러 상황을 만드는 계기가 되기 때문에 시나리오 외 불필요한 옵션은 추가하지 않았습니다.
 3. 협업 및 인수인계 시 가독성 증대를 위해 공식 DOCS 및 가이드의 예시 구조를 최대한 살리고자 노력하였습니다.
-4. 변수명에 terraform.workespace 를 사용하여 환경별로 분리하여 사용할 수 있습니다.
+4. 시나리오 요구사항에 맞게 자원을 구성하는 것을 1순위로 생각하여 진행하였기 때문에 환경,변수의 분리 및 테라폼 전체 파일 구조에 대한 설계와 같은 로직은 건드리지 않고 진행하였습니다. 
 
 ## 1. provider.tf
 1. provider 의 경우 aws, kubernetes, terraform, helm 버전을 지정하였으며 backend를 사용할 경우 tfstate의 S3 저장 후 공동 작업, 충돌 방지 기능을 사용할 수 있도록 작성하였습니다.
@@ -78,9 +78,6 @@ No outputs.
 2. 기본 addons을 모두 사용합니다.
 3. Karpenter 가 동작함과 동시에 노드 관리에서 제외되는 Karpenter 전용 관리형 노드 그룹을 생성하여 지정해줍니다.
 4. Karpenter 접근을 위한 엔드포인트 true 옵션을 추가하였습니다.
-```terraform
-  cluster_endpoint_public_access           = true
-```
 
 ## 4. karpenter.tf
 1. Karpenter 모듈을 통한 설치를 진행하며 helm values 옵션을 통해 EKS Karpenter 전용 관리형 노드에 설치되게 합니다. 
@@ -92,7 +89,7 @@ No outputs.
 3. 디플로이먼트의 파드의 경우 각 노드마다 1개씩 각각 POD가 배치되어야 한다는 시나리오 요구사항이 존재하지않아 레이블을 통한 노드 배치 이외에 추가 로직은 작성하지 않았습니다.
 
 ## 6. service.tf
-1. port, target port 모두 동일하게 8080를 사용하는 Cluster IP 기본 서비스를 생성하였으며 EKS의 vpc-cni Add on, ALB Target-type IP 모드를 사용할 경우 충분히 외부 노출이 가능합니다. 
+1. port, target port 모두 동일하게 8080를 사용하는 Cluster IP 기본 서비스를 생성하였으며 EKS의 vpc-cni Add on을 통해 ALB Target-type IP 모드 조합으로 노출하였습니다. 
 
 ## 7. alb.tf
 1. EKS 쿠버네티스의 서비스 및 인그레스와의 직적 연동을 위해 ALB Controller 를 Helm 으로 설치하여 사용하며 이또한 전부 Terraform 자원으로 설계하였습니다.
